@@ -1,93 +1,99 @@
-Aqui está um modelo completo, profissional e direto ao ponto para o seu `README.md`. Ele foi desenhado para impressionar seu professor, explicando a arquitetura híbrida (Python + Hop), o banco de dados na nuvem e, o mais importante, como rodar o projeto com um único comando via Docker.
+# Etapa 1: Modelagem Dimensional
 
-Basta copiar o conteúdo abaixo e colar no seu arquivo `README.md` na raiz do projeto.
+## 1.1. Modelo Dimensional de Alto Nível
+
+### 1.1.1. Escopo do Projeto
+
+O escopo desta fase consiste na transformação dos dados brutos da Olist, que originalmente operam em um modelo relacional transacional, em uma arquitetura de dados orientada a análises (OLAP). O trabalho abrange o desenho arquitetural de um modelo dimensional no formato **Star Schema**.
+
+O objetivo central é reestruturar as tabelas normalizadas de pedidos, itens, produtos, clientes e vendedores em um esquema focado em maximizar a performance analítica de leitura. O escopo encerra-se com o planejamento para a implementação física deste Data Warehouse em um banco de dados **PostgreSQL** hospedado na nuvem via plataforma **Supabase**.
 
 ---
 
-# 🚀 Projeto Data Warehouse Olist - ETL Híbrido com Apache Hop e Python
+### 1.1.2. Granularidade da Tabela de Fatos
 
-Este projeto implementa um pipeline de dados ponta a ponta (ETL) para popular um Data Warehouse baseado no dataset público de e-commerce da Olist.
+A granularidade estabelecida para a tabela de fatos principal é do nível transacional mais detalhado:
 
-A arquitetura utiliza **Apache Hop** como principal motor de orquestração e integração de dados, **Python** para transformações específicas (geração da dimensão de tempo) e **PostgreSQL** hospedado na nuvem (Supabase) como destino final (Data Warehouse). Para garantir a reprodutibilidade em qualquer sistema operacional, todo o ambiente de execução foi empacotado usando **Docker**.
+> **1 linha = 1 item de produto vendido dentro de um pedido.**
 
-## 🛠️ Tecnologias Utilizadas
+Esta definição de grão é mandatória porque um único pedido referenciado na base original pode conter múltiplos itens distintos, associados a diferentes categorias de produtos e comercializados por diferentes vendedores.
 
-* **Apache Hop Web:** Orquestração e fluxos de dados (Pipelines e Workflows).
-* **Python:** Pré-processamento e engenharia de features para geração da Dimensão de Tempo (`dim_time`).
-* **Docker:** Containerização do ambiente (Apache Hop + Python embutido).
-* **PostgreSQL (Supabase):** Banco de dados em nuvem atuando como Data Warehouse.
+---
 
-## 📂 Estrutura do Projeto
+### 1.1.3. Diagrama Inicial do Modelo Dimensional
 
-O projeto está organizado de forma a separar dados brutos, scripts de processamento e fluxos do Apache Hop:
+[Ver diagrama inicial](Modelagem/imagem1.png)
 
-```text
-/
-├── docker-compose.yml       # Orquestrador do container Apache Hop Web
-├── Dockerfile               # Imagem customizada do Hop instalando Python e dependências
-├── requirements.txt         # Bibliotecas Python (ex: pandas, numpy)
-├── README.md                # Documentação do projeto
-│
-├── scripts/                 
-│   ├── gerar_dim_tempo.py   # Script Python que gera o CSV da dim_time
-│   └── run_python_etl.sh    # Shell script que executa o Python via Hop
-│
-├── dados/                   
-│   └── *.csv                # Arquivos CSV originais da Olist + dim_time.csv (gerado)
-│
-└── hop_project/             
-    ├── wf_master.hwf        # Workflow principal (Orquestrador)
-    ├── wf_dimensoes.hwf     # Workflow de carga das Dimensões
-    ├── wf_fato.hwf          # Workflow de carga da tabela Fato
-    └── *.hpl                # Pipelines de ingestão individuais
+---
 
-```
+## 1.2. Modelo Dimensional Detalhado
 
-## ⚙️ Como Executar (Ambiente Dockerizado)
+### A. Documentação Detalhada
 
-Graças ao Docker, não é necessário instalar o Apache Hop, configurar o Python localmente ou ajustar caminhos de pastas. Todo o diretório do projeto é mapeado automaticamente para `/opt/olist_pipeline/` dentro do container.
+[Ver documentação detalhada](Modelagem/Cloud%20Analytics%20com%20Olist.xlsx)
 
-### Pré-requisitos
+---
 
-* **Docker** e **Docker Compose** instalados na máquina.
-* Conexão com a internet (para baixar a imagem do Hop, instalar pacotes e comunicar-se com o Supabase).
+### B. Diagrama Entidade-Relacionamento (DER)
 
-### Passo a Passo
-
-1. **Inicie o ambiente:**
-Abra o terminal na raiz do projeto e execute o comando abaixo para construir a imagem customizada e subir o serviço em segundo plano:
-```bash
-docker-compose up -d --build
-
-```
+[Ver DER](Modelagem/imagem2.png)
 
 
-2. **Acesse o Apache Hop Web:**
-Abra o seu navegador e acesse:
-[http://localhost:8080](https://www.google.com/search?q=http://localhost:8080)
-3. **Execute o Pipeline:**
-* Na interface do Apache Hop, clique no ícone de pasta (Open) no canto superior esquerdo.
-* Navegue até o diretório: `/opt/olist_pipeline/hop_project/`
-* Abra o arquivo **`workflow_principal.hwf`**.
-* Clique no botão de "Play" (Run) no topo da tela.
+# Etapa 2: Pipeline de ETL (Local para Nuvem) com Apache Hop
 
+## DDL
 
+[ddl.sql](ETL/DDL/ddl.sql)
 
-## 🧠 Lógica de Orquestração (Workflow Master)
+---
 
-O `wf_master.hwf` garante o princípio de integridade referencial do Data Warehouse, executando os passos na seguinte ordem estrita:
+## Pipelines Apache Hop
 
-1. **Carga das Dimensões (`workflow_dimensoes.hwf`):** * Inicia acionando um nó **Shell** que executa o script Python (`build_dim_time.sh`). O Python lê as datas do dataset, trata os formatos temporais e gera um CSV atualizado para a dimensão de tempo.
-* Em seguida, os pipelines (`.hpl`) carregam simultaneamente/sequencialmente as tabelas `dim_time`, `dim_cliente`, `dim_vendedor`, etc., direto no banco de dados.
+### Dimensões
 
+[dim_customers.hpl](ETL/hop_project/dim_customers.hpl) | [dim_items.hpl](ETL/hop_project/dim_items.hpl) | [dim_order_payments.hpl](ETL/hop_project/dim_order_payments.hpl) | [dim_sellers.hpl](ETL/hop_project/dim_sellers.hpl) | [dim_time.hpl](ETL/hop_project/dim_time.hpl) | [fact.hpl](ETL/hop_project/fact.hpl)
 
-2. **Carga da Fato (`workflow_fato.hwf`):**
-* Só é acionado mediante **100% de sucesso** do workflow anterior.
-* Faz a leitura das tabelas de itens e pedidos cruzando as chaves estrangeiras (Lookup) com os dados das dimensões recém-carregadas.
+### Workflows
 
+[workflow_dimensoes.hwf](ETL/hop_project/workflow_dimensoes.hwf) | [workflow_fato.hwf](ETL/hop_project/workflow_fato.hwf) | [workflow_principal.hwf](ETL/hop_project/workflow_principal.hwf)
 
+---
 
-## ⚠️ Notas Importantes
+## Scripts Auxiliares
 
-* **Banco de Dados em Nuvem:** O Data Warehouse está hospedado no Supabase. Não há container de banco de dados rodando localmente.
-* **Caminhos Absolutos:** Todas as chamadas de arquivo dentro do Hop (tanto para leitura de CSVs quanto chamadas de scripts) utilizam o path absoluto `/opt/olist_pipeline/...` para garantir estabilidade cross-platform (Windows/Mac/Linux).
+[build_dim_time.py](ETL/scripts/build_dim_time.py) | [build_fact.py](ETL/scripts/build_fact.py) | [Prepara_csv_dim_time.sh](ETL/scripts/Prepara_csv_dim_time.sh) | [Prepara_csv_fact.sh](ETL/scripts/Prepara_csv_fact.sh)
+
+---
+
+## Ambiente Docker
+
+[docker-compose.yml](ETL/docker-compose.yml) | [Dockerfile](ETL/Dockerfile) | [requirements.txt](ETL/requirements.txt)
+
+# Etapa 3: Visualização e Insights no Preset.io
+
+# Etapa 3: Visualização e Insights no Preset.io
+
+## Painel interativo (Preset.io)
+
+[Olist - Performance Logística e Vendas](https://bd4ac460.us1a.app.preset.io/superset/dashboard/p/qvQwYvynXNM/)
+
+O dashboard foi compartilhado com o email: italo.silva@ifal.edu.br.
+
+---
+
+## Relatório executivo
+
+[Relatório Executivo Olist Detalhado.pdf](Análise%20de%20Dados/Relatório%20Executivo%20Olist%20Detalhado.pdf)
+
+O relatório consolida a análise executiva da operação Olist, destacando os principais gargalos logísticos e oportunidades de vendas identificadas.
+
+---
+
+## 👥 Grupo
+
+| Nome |
+|------|
+| João Paulo Vieira Alves dos Santos |
+| Lucas Gabryel Nascimento Santos |
+| Luis Henrique Amorim da Silva |
+| Malba Vinicius Lopes Santos |
